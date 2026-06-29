@@ -98,7 +98,7 @@ plt.xlabel('Predictive Weight Percentage (%)', fontsize=12)
 plt.ylabel('Feature Name', fontsize=12)
 plt.xlim(0, importance_df['Percentage (%)'].max() + 3) # Give extra room for the text labels
 plt.tight_layout()
-plt.savefig('feature_importance.png', dpi=300)
+plt.savefig('Graphs/feature_importance.png', dpi=300)
 plt.show()
 
 cm = confusion_matrix(y_test, y_pred)
@@ -110,7 +110,7 @@ disp.plot(cmap='Blues', ax=ax, values_format='d', colorbar=False)
 
 plt.title('Confusion Matrix: True vs Predicted', fontsize=14, fontweight='bold')
 plt.tight_layout()
-plt.savefig('confusion_matrix.png', dpi=300)
+plt.savefig('Graphs/confusion_matrix.png', dpi=300)
 plt.show()
 
 fpr, tpr, _ = roc_curve(y_test, y_prob)
@@ -127,5 +127,5 @@ plt.title('Receiver Operating Characteristic (ROC) Curve', fontsize=14, fontweig
 plt.legend(loc="lower right", frameon=True)
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
-plt.savefig('roc_curve.png', dpi=300)
+plt.savefig('Graphs/roc_curve.png', dpi=300)
 plt.show()
