@@ -1,18 +1,18 @@
+# IMPORTING LIBRARIES
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-df = pd.read_csv("KOI_Cumulative_clean.csv")
+df = pd.read_csv("KOI_Cumulative_clean.csv") # LOADING DATASET
 
 from sklearn.preprocessing import LabelEncoder
 le = LabelEncoder()
-df_bin = df[df['koi_disposition'].isin(['CONFIRMED', 'FALSE POSITIVE'])].copy()
+df_bin = df[df['koi_disposition'].isin(['CONFIRMED', 'FALSE POSITIVE'])].copy() #ENCODING TARGET VARIABLE FOR BINARY CLASSIFICATION
+
 y = le.fit_transform(df_bin['koi_disposition'])
-initial_drop_cols = [
-'koi_disposition', 'koi_pdisposition',
-    'koi_fpflag_nt', 'koi_fpflag_ss', 'koi_fpflag_co', 'koi_fpflag_ec'
-]
+initial_drop_cols = ['koi_disposition', 'koi_pdisposition',
+    'koi_fpflag_nt', 'koi_fpflag_ss', 'koi_fpflag_co', 'koi_fpflag_ec', 'rowid', 'kepid', 'koi_score', 'kepler_name']
 initial_drop_cols = [col for col in initial_drop_cols if col in df_bin.columns]
 X_temp = df_bin.drop(columns=initial_drop_cols)
 X = X_temp.select_dtypes(include='number')
@@ -21,8 +21,19 @@ X = X.fillna(X.median())
 print(f"Feature shape : {X.shape}")
 print(f"Target shape : {y.shape}")
 
+# TRAIN TEST SPLIT
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+train_medians = X_train.median()
+X_train = X_train.fillna(train_medians)
+X_test = X_test.fillna(train_medians)
+X_train['duty_cycle'] = X_train['koi_duration'] / (X_train['koi_period'] * 24)
+X_test['duty_cycle'] = X_test['koi_duration'] / (X_test['koi_period'] * 24)
+
+X_train['depth_per_snr'] = X_train['koi_depth'] / (X_train['koi_model_snr'] + 1e-5)
+X_test['depth_per_snr'] = X_test['koi_depth'] / (X_test['koi_model_snr'] + 1e-5)
+
 print(f"Training features shape: {X_train.shape}")
 print(f"Testing features shape: {X_test.shape}")
 
@@ -67,8 +78,9 @@ rf_imp = ensemble_model.named_estimators_['rf_model'].feature_importances_
 gb_imp = ensemble_model.named_estimators_['gb_model'].feature_importances_
 xgb_imp = ensemble_model.named_estimators_['xgb_model'].feature_importances_
 ensemble_importance = (rf_imp + gb_imp + xgb_imp) / 3
+
 importance_df = pd.DataFrame({
-    'Feature': X.columns,
+    'Feature': X_train.columns,
     'Importance': ensemble_importance
 })
 
