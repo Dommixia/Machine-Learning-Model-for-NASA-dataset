@@ -102,7 +102,7 @@ plt.savefig('Graphs/feature_importance.png', dpi=300)
 plt.show()
 
 cm = confusion_matrix(y_test, y_pred)
-display_labels = le.inverse_transform([0, 1]) # Maps 0 and 1 back to 'CONFIRMED' / 'FALSE POSITIVE'
+display_labels = le.inverse_transform([0, 1])
 
 fig, ax = plt.subplots(figsize=(6, 6))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=display_labels)
