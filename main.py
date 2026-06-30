@@ -12,7 +12,12 @@ df_bin = df[df['koi_disposition'].isin(['CONFIRMED', 'FALSE POSITIVE'])].copy() 
 
 y = le.fit_transform(df_bin['koi_disposition'])
 initial_drop_cols = ['koi_disposition', 'koi_pdisposition',
-    'koi_fpflag_nt', 'koi_fpflag_ss', 'koi_fpflag_co', 'koi_fpflag_ec', 'rowid', 'kepid', 'koi_score', 'kepler_name']
+    'koi_fpflag_nt', 'koi_fpflag_ss', 'koi_fpflag_co', 'koi_fpflag_ec', 'rowid', 'kepid', 'koi_score', 'kepler_name', 'koi_count', 'koi_num_transits',  'koi_tce_plnt_num', 'koi_datalink_dvr',
+                     'koi_fittype',]
+clean_features = ['koi_period', 'koi_duration', 'koi_depth', 'koi_ror', 'koi_impact',
+    'koi_model_snr', 'koi_prad', 'koi_teq', 'koi_insol', 'koi_dor', 'koi_sma',
+    'koi_steff', 'koi_slogg', 'koi_srad', 'koi_smet', 'koi_smass', 'koi_kepmag',
+    'duty_cycle', 'depth_per_snr']
 initial_drop_cols = [col for col in initial_drop_cols if col in df_bin.columns]
 X_temp = df_bin.drop(columns=initial_drop_cols)
 X = X_temp.select_dtypes(include='number')
@@ -21,6 +26,8 @@ X = X.fillna(X.median())
 print(f"Feature shape : {X.shape}")
 print(f"Target shape : {y.shape}")
 
+err_cols = [col for col in X.columns if col.endswith('_err1') or col.endswith('_err2')]
+
 # TRAIN TEST SPLIT
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
@@ -28,11 +35,17 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 train_medians = X_train.median()
 X_train = X_train.fillna(train_medians)
 X_test = X_test.fillna(train_medians)
+X_train = X_train.drop(columns=err_cols)
+X_test = X_test.drop(columns=err_cols)
 X_train['duty_cycle'] = X_train['koi_duration'] / (X_train['koi_period'] * 24)
 X_test['duty_cycle'] = X_test['koi_duration'] / (X_test['koi_period'] * 24)
 
 X_train['depth_per_snr'] = X_train['koi_depth'] / (X_train['koi_model_snr'] + 1e-5)
 X_test['depth_per_snr'] = X_test['koi_depth'] / (X_test['koi_model_snr'] + 1e-5)
+
+clean_features = [c for c in clean_features if c in X_train.columns]
+X_train_final = X_train[clean_features]
+X_test_final = X_test[clean_features]
 
 print(f"Training features shape: {X_train.shape}")
 print(f"Testing features shape: {X_test.shape}")
@@ -56,14 +69,14 @@ print("----------------------------------------")
 print("---------- TRAINING MODEL ------------")
 
 train_start = time.perf_counter()
-ensemble_model.fit(X_train, y_train)
-y_pred = ensemble_model.predict(X_test)
-y_prob = ensemble_model.predict_proba(X_test)[:, 1]
+ensemble_model.fit(X_train_final, y_train)
+y_pred = ensemble_model.predict(X_test_final)
+y_prob = ensemble_model.predict_proba(X_test_final)[:, 1]
 roc_auc = roc_auc_score(y_test, y_prob)
 class_report = classification_report(y_test, y_pred)
 train_end = time.perf_counter()
 time = train_end - train_start
-train_proba = ensemble_model.predict_proba(X_train)[:, 1]
+train_proba = ensemble_model.predict_proba(X_train_final)[:, 1]
 train_auc = roc_auc_score(y_train, train_proba)
 
 print(f"Training AUC: {train_auc:.4f}")
@@ -80,7 +93,7 @@ xgb_imp = ensemble_model.named_estimators_['xgb_model'].feature_importances_
 ensemble_importance = (rf_imp + gb_imp + xgb_imp) / 3
 
 importance_df = pd.DataFrame({
-    'Feature': X_train.columns,
+    'Feature': X_train_final.columns,
     'Importance': ensemble_importance
 })
 
@@ -145,7 +158,7 @@ plt.show()
 import shap
 trained_xgb = ensemble_model.named_estimators_['xgb_model']
 explainer = shap.TreeExplainer(trained_xgb)
-X_test_subset = X_test.head(300)
+X_test_subset = X_test_final.head(300)
 shap_values = explainer(X_test_subset)
 plt.figure(figsize=(12, 8), dpi=300)
 shap.summary_plot(shap_values, X_test_subset, max_display=15, show=False)
