@@ -163,19 +163,20 @@ This ranking is consistent with established exoplanet vetting principles: planet
 
 ### Feature Importance
 
-![Feature Importance](Graphs/feature_importance.png)
+<img src="Graphs/feature_importance.png" alt="Feature Importance" width="450"/>
+
 
 This chart reports the ensemble-averaged importance of each retained feature, normalized to a percentage of total model weight. `koi_prad` (planet radius) is the single strongest predictor at 22.4 percent, followed by the engineered `duty_cycle` feature (15.2 percent) and `koi_model_snr` (13.4 percent). Together these three features account for over half of total model weight, indicating the classifier relies primarily on whether a candidate's size is physically plausible for a planet and whether its transit shape and detection strength are statistically convincing, rather than on any single stellar parameter. No vetting-pipeline diagnostic feature appears in this ranking, supporting the conclusion that predictive power is derived from genuine transit physics.
 
 ### ROC Curve
 
-![ROC Curve](Graphs/roc_curve.png)
+<img src="Graphs/roc_curve.png" alt="ROC Curve" width="350"/>
 
 The ROC curve plots true positive rate against false positive rate across all classification thresholds, with an area under the curve (AUC) of 0.9768. The curve rises steeply near the origin, reaching a true positive rate above 0.85 while the false positive rate remains below 0.05, indicating the model achieves strong separation between classes at conservative decision thresholds. This is a substantially different curve shape from the near-perfect, almost rectangular ROC curve produced by the earlier leakage-affected model (AUC near 0.99 with `koi_dikco_msky`/`koi_fwm_stat_sig` included); the comparatively more gradual upper-left bend here reflects a classifier learning from genuine but imperfect physical evidence rather than near-deterministic vetting outputs.
 
 ### SHAP Summary Plot
 
-![SHAP Summary](Graphs/shap_summary.png)
+<img src="Graphs/shap_summary.png" alt="SHAP Summary" width="450"/>
 
 The SHAP (Shapley Additive exPlanations) plot decomposes individual predictions from the XGBoost component of the ensemble, showing both the magnitude and direction of each feature's contribution across the test set. Each point is one test sample; horizontal position indicates the feature's impact on the model's output toward CONFIRMED (positive) or FALSE POSITIVE (negative), and color indicates whether the underlying feature value was high (red/pink) or low (blue) for that sample.
 
