@@ -141,3 +141,16 @@ plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.savefig('Graphs/roc_curve.png', dpi=300)
 plt.show()
+
+import shap
+trained_xgb = ensemble_model.named_estimators_['xgb_model']
+explainer = shap.TreeExplainer(trained_xgb)
+X_test_subset = X_test.head(300)
+shap_values = explainer(X_test_subset)
+plt.figure(figsize=(12, 8), dpi=300)
+shap.summary_plot(shap_values, X_test_subset, max_display=15, show=False)
+plt.title("SHAP Value Impact on Model Predictions (XGBoost)", fontsize=14, fontweight='bold', pad=20)
+plt.xlabel("SHAP Value (Impact on Model Output Verdict)", fontsize=12)
+plt.tight_layout()
+plt.savefig("Graphs/shap_summary.png", bbox_inches='tight')
+plt.close()
