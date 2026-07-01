@@ -1,4 +1,4 @@
-# Astra — KOI Exoplanet Classification
+# KOI Exoplanet Classification
 
 A machine learning pipeline that classifies Kepler Objects of Interest as confirmed exoplanets or false positives using only physical transit and stellar measurements, with no reliance on Kepler pipeline vetting outputs.
 
