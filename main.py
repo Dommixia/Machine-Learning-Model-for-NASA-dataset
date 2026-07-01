@@ -187,3 +187,44 @@ plt.xlabel("SHAP Value (Impact on Model Output Verdict)", fontsize=12)
 plt.tight_layout()
 plt.savefig("Graphs/shap_summary.png", bbox_inches='tight')
 plt.close()
+
+corr_df = X_train_final.copy()
+corr_df['target'] = y_train
+
+corr_matrix = corr_df.corr(method='pearson')
+
+plt.figure(figsize=(14, 12))
+mask = None
+
+sns.heatmap(
+    corr_matrix,
+    annot=True,
+    fmt='.2f',
+    cmap='coolwarm',
+    center=0,
+    vmin=-1, vmax=1,
+    square=True,
+    linewidths=0.5,
+    cbar_kws={'label': 'Pearson Correlation Coefficient'},
+    annot_kws={'size': 8}
+)
+
+plt.title('Feature Correlation Heatmap (Final Physical Feature Set)', fontsize=14, fontweight='bold')
+plt.xticks(rotation=45, ha='right', fontsize=9)
+plt.yticks(rotation=0, fontsize=9)
+plt.tight_layout()
+plt.savefig('Graphs/correlation_heatmap.png', dpi=300)
+plt.show()
+
+feature_corr = corr_matrix.drop(columns='target').drop(index='target')
+corr_pairs = (
+    feature_corr.where(~feature_corr.abs().eq(1.0))
+    .unstack()
+    .dropna()
+    .sort_values(key=lambda x: x.abs(), ascending=False)
+)
+corr_pairs = corr_pairs.iloc[::2]
+
+target_corr = corr_matrix['target'].drop('target').sort_values(key=abs, ascending=False)
+print("\nFeature correlation with target (CONFIRMED = 1):")
+print(target_corr)
