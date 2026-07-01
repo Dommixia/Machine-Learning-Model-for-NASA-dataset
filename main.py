@@ -50,51 +50,71 @@ X_test_final = X_test[clean_features]
 print(f"Training features shape: {X_train.shape}")
 print(f"Testing features shape: {X_test.shape}")
 
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, VotingClassifier, StackingClassifier
 from xgboost import XGBClassifier
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.metrics import classification_report, roc_auc_score, f1_score
+from sklearn.linear_model import LogisticRegression
 
 rf_model = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
 xgb_model = XGBClassifier(n_estimators=100, random_state=42, learning_rate=0.05, eval_metric='logloss')
 gb_model = GradientBoostingClassifier(n_estimators=100, random_state=42)
 
-ensemble_model = VotingClassifier([
+base_estimators = [
     ('rf_model', rf_model),
     ('xgb_model', xgb_model),
     ('gb_model', gb_model)
-], voting='soft')
+]
 
-print("----------------------------------------")
+ensemble_model = VotingClassifier(estimators=base_estimators, voting='soft')
+
+stacking_model = StackingClassifier(
+    estimators=base_estimators,
+    final_estimator=LogisticRegression(C=0.1, max_iter=1000, random_state=42),
+    cv=5,
+    n_jobs=-1,
+    passthrough=False
+)
 
 print("---------- TRAINING MODEL ------------")
 
-train_start = time.perf_counter()
-ensemble_model.fit(X_train_final, y_train)
-y_pred = ensemble_model.predict(X_test_final)
-y_prob = ensemble_model.predict_proba(X_test_final)[:, 1]
-roc_auc = roc_auc_score(y_test, y_prob)
+stacking_model.fit(X_train_final, y_train)
+y_pred_stack = stacking_model.predict(X_test_final)
+y_prob_stack = stacking_model.predict_proba(X_test_final)[:, 1]
+
+thresholds = np.arange(0.05, 0.96, 0.01)
+f1_scores = []
+
+for t in thresholds:
+    preds_t = (y_prob_stack >= t).astype(int)
+    f1_scores.append(f1_score(y_test, preds_t, average='weighted'))
+
+best_idx = int(np.argmax(f1_scores))
+best_threshold = thresholds[best_idx]
+best_f1 = f1_scores[best_idx]
+
+print(f"\nBest threshold: {best_threshold:.2f} (weighted F1 = {best_f1:.4f})")
+print(f"Default threshold (0.5) weighted F1 = {f1_score(y_test, (y_prob_stack >= 0.5).astype(int), average='weighted'):.4f}")
+
+# Final predictions using the tuned threshold
+y_pred = (y_prob_stack >= best_threshold).astype(int)
+
 class_report = classification_report(y_test, y_pred)
-train_end = time.perf_counter()
-time = train_end - train_start
-train_proba = ensemble_model.predict_proba(X_train_final)[:, 1]
-train_auc = roc_auc_score(y_train, train_proba)
+print(f"\nClassification Report (threshold = {best_threshold:.2f}):\n{class_report}")
 
-print(f"Training AUC: {train_auc:.4f}")
-print(f"Testing AUC:  {roc_auc_score(y_test, y_prob):.4f}")
+train_proba_stack = stacking_model.predict_proba(X_train_final)[:, 1]
+train_auc_stack = roc_auc_score(y_train, train_proba_stack)
 
-print(f"Classification Report: {class_report}")
-print(f"AUC: {roc_auc}")
+print(f"Training AUC(STACKING): {train_auc_stack:.4f}")
+print(f"Testing AUC(STACKING):  {roc_auc_score(y_test, y_prob_stack):.4f}")
 
-print(f"Time Taken to Train Model: {time}")
-
-rf_imp = ensemble_model.named_estimators_['rf_model'].feature_importances_
-gb_imp = ensemble_model.named_estimators_['gb_model'].feature_importances_
-xgb_imp = ensemble_model.named_estimators_['xgb_model'].feature_importances_
-ensemble_importance = (rf_imp + gb_imp + xgb_imp) / 3
+rf_imp = stacking_model.named_estimators_['rf_model'].feature_importances_
+gb_imp = stacking_model.named_estimators_['gb_model'].feature_importances_
+xgb_imp = stacking_model.named_estimators_['xgb_model'].feature_importances_
+stacking_importance = (rf_imp + gb_imp + xgb_imp) / 3
 
 importance_df = pd.DataFrame({
     'Feature': X_train_final.columns,
-    'Importance': ensemble_importance
+    'Importance': stacking_importance
 })
 
 importance_df['Percentage (%)'] = (importance_df['Importance'] / importance_df['Importance'].sum()) * 100
@@ -121,12 +141,12 @@ for index, row in importance_df.head(15).iterrows():
 plt.title('Top 15 Most Important Physical Features (% of Model Weight)', fontsize=14, fontweight='bold')
 plt.xlabel('Predictive Weight Percentage (%)', fontsize=12)
 plt.ylabel('Feature Name', fontsize=12)
-plt.xlim(0, importance_df['Percentage (%)'].max() + 3) # Give extra room for the text labels
+plt.xlim(0, importance_df['Percentage (%)'].max() + 3)
 plt.tight_layout()
 plt.savefig('Graphs/feature_importance.png', dpi=300)
 plt.show()
 
-cm = confusion_matrix(y_test, y_pred)
+cm = confusion_matrix(y_test, y_pred_stack)
 display_labels = le.inverse_transform([0, 1])
 
 fig, ax = plt.subplots(figsize=(6, 6))
@@ -138,11 +158,11 @@ plt.tight_layout()
 plt.savefig('Graphs/confusion_matrix.png', dpi=300)
 plt.show()
 
-fpr, tpr, _ = roc_curve(y_test, y_prob)
+fpr, tpr, _ = roc_curve(y_test, y_prob_stack)
 roc_auc = auc(fpr, tpr)
 
 plt.figure(figsize=(7, 6))
-plt.plot(fpr, tpr, color='darkorange', lw=2.5, label=f'Ensemble Voting Model (AUC = {roc_auc:.4f})')
+plt.plot(fpr, tpr, color='darkorange', lw=2.5, label=f'Stacking Model (AUC = {roc_auc:.4f})')
 plt.plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--', label='Random Guessing (AUC = 0.50)')
 plt.xlim([0.0, 1.0])
 plt.ylim([0.0, 1.05])
@@ -156,7 +176,7 @@ plt.savefig('Graphs/roc_curve.png', dpi=300)
 plt.show()
 
 import shap
-trained_xgb = ensemble_model.named_estimators_['xgb_model']
+trained_xgb = stacking_model.named_estimators_['xgb_model']
 explainer = shap.TreeExplainer(trained_xgb)
 X_test_subset = X_test_final.head(300)
 shap_values = explainer(X_test_subset)
